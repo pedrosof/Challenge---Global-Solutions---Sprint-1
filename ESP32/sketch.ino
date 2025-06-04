@@ -3,25 +3,25 @@
 #include <HTTPClient.h>
 
 // === Sensores ===
-const int SOIL_MOISTURE_PIN = 34;   // Sensor de umidade do solo
-const int RAIN_SENSOR_PIN = 35;     // Sensor de chuva (analógico)
-const int MPU_ADDR = 0x68;          // MPU6050 padrão
-const int LED_ALERT_PIN = 19;       // LED azul
+const int SOIL_MOISTURE_PIN = 34;
+const int RAIN_SENSOR_PIN = 35;
+const int MPU_ADDR = 0x68;
+const int LED_ACTIVITY_PIN = 19;
 
 // === Wi-Fi ===
-char* WIFI_NAME = "Wokwi-GUEST";    // Substitua conforme sua rede
+char* WIFI_NAME = "Wokwi-GUEST";
 char* WIFI_PASSWORD = "";
 WiFiClient client;
 
 // === Backend Flask ===
-String backendURL = "http://192.168.1.100:5000/prever";  // Altere com o IP real do servidor
+String backendURL = "http://192.168.1.100:5000/prever";
 
-// === Variáveis MPU6050 ===
+// === MPU6050 variáveis ===
 int16_t ax, ay, az;
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin();  // I2C (SDA = 21, SCL = 22)
+  Wire.begin();  // SDA=21, SCL=22
   WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
 
   Serial.println("Conectando ao Wi-Fi...");
@@ -29,31 +29,32 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println();
-  Serial.println("Wi-Fi conectado. IP: " + String(WiFi.localIP()));
+  Serial.println("\nWi-Fi conectado. IP: " + String(WiFi.localIP()));
 
-  pinMode(LED_ALERT_PIN, OUTPUT);
-  digitalWrite(LED_ALERT_PIN, LOW);
+  pinMode(LED_ACTIVITY_PIN, OUTPUT);
+  digitalWrite(LED_ACTIVITY_PIN, LOW);
 
   // Inicializa MPU6050
   Wire.beginTransmission(MPU_ADDR);
-  Wire.write(0x6B);  // registrador PWR_MGMT_1
-  Wire.write(0);     // ativa o MPU
+  Wire.write(0x6B);
+  Wire.write(0);
   Wire.endTransmission(true);
 }
 
 void loop() {
-  // === Sensor de umidade do solo ===
+  digitalWrite(LED_ACTIVITY_PIN, HIGH);  // LED indica "coletando"
+
+  // === Leitura do sensor de umidade do solo ===
   int soilRaw = analogRead(SOIL_MOISTURE_PIN);
   int soilMoisturePercentage = map(soilRaw, 0, 4095, 0, 100);
 
-  // === Sensor de chuva ===
+  // === Leitura do sensor de chuva ===
   int rainRaw = analogRead(RAIN_SENSOR_PIN);
-  int rainPercentage = map(rainRaw, 0, 4095, 100, 0);  // inverso: +chuva = +molhado = valor baixo
+  int rainPercentage = map(rainRaw, 0, 4095, 100, 0);
 
-  // === MPU6050: leitura de inclinação ===
+  // === Leitura da inclinação via MPU6050 ===
   Wire.beginTransmission(MPU_ADDR);
-  Wire.write(0x3B);  // ACCEL_XOUT_H
+  Wire.write(0x3B);
   Wire.endTransmission(false);
   Wire.requestFrom(MPU_ADDR, 6, true);
 
@@ -64,7 +65,7 @@ void loop() {
   float ax_g = ax / 16384.0;
   float inclinacao = ax_g * 90.0;
 
-  // === Serial Monitor ===
+  // === Debug via Serial ===
   Serial.println("-------------");
   Serial.print("Umidade do solo: ");
   Serial.print(soilMoisturePercentage);
@@ -78,7 +79,7 @@ void loop() {
   Serial.print(inclinacao);
   Serial.println("°");
 
-  // === Envio para backend ===
+  // === Envio para o backend ===
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
     http.begin(backendURL);
@@ -92,17 +93,7 @@ void loop() {
 
     if (httpResponseCode > 0) {
       String response = http.getString();
-      Serial.print("Resposta do servidor: ");
-      Serial.println(response);
-
-      // Aciona LED se risco alto
-      if (response.indexOf("\"risco\": \"alto\"") != -1) {
-        digitalWrite(LED_ALERT_PIN, HIGH);
-        Serial.println("ALERTA: RISCO DE DESLIZAMENTO!");
-      } else {
-        digitalWrite(LED_ALERT_PIN, LOW);
-      }
-
+      Serial.println("Resposta do servidor: " + response);
     } else {
       Serial.print("Erro HTTP: ");
       Serial.println(httpResponseCode);
@@ -113,5 +104,6 @@ void loop() {
     Serial.println("Wi-Fi desconectado.");
   }
 
-  delay(15000);  // 15 segundos
+  digitalWrite(LED_ACTIVITY_PIN, LOW);  // LED indica "esperando"
+  delay(15000);  // espera antes da próxima coleta
 }
