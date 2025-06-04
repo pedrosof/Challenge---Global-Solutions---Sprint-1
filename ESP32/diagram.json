@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "author": "Fábio Pedroso",
+  "editor": "wokwi",
+  "parts": [
+    { 
+      "type": "board-esp32-devkit-c-v4", 
+      "id": "esp", 
+      "top": 0, 
+      "left": -4.76, 
+      "attrs": {} 
+    },
+    {
+      "type": "chip-soil-moisture-sensor",
+      "id": "sen1",
+      "top": 97.02,
+      "left": -156.59,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led1",
+      "top": -42,
+      "left": 109.4,
+      "attrs": { "color": "blue", "flip": "" }
+    },
+    { 
+      "type": "wokwi-mpu6050", 
+      "id": "imu1", 
+      "top": -34.58, 
+      "left": -180.08, 
+      "attrs": {} 
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:3V3", "sen1:VCC", "red", [ "h-23.81", "v79.78" ] ],
+    [ "esp:GND.1", "sen1:GND", "black", [ "h-23.81", "v-35.42" ] ],
+    [ "esp:34", "sen1:SIG", "yellow", [ "h-14.21", "v60.58" ] ],
+    [ "led1:C", "esp:GND.3", "green", [ "v0" ] ],
+    [ "led1:A", "esp:19", "green", [ "v0" ] ],
+    [ "imu1:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "imu1:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "imu1:SCL", "esp:22", "green", [ "v0" ] ],
+    [ "imu1:SDA", "esp:21", "green", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
