@@ -26,9 +26,9 @@ def enviar_simulacao(qtd=10, intervalo=2):
             if response.status_code == 200:
                 print(f"✔️ Enviado com sucesso → Resposta: {response.json()}")
             else:
-                print(f"❌ Erro HTTP {response.status_code}")
+                print(f"Erro HTTP {response.status_code}")
         except Exception as e:
-            print(f"🚫 Erro de conexão: {e}")
+            print(f"Erro de conexão: {e}")
 
         print(f"[{i+1}] LED OFF → Aguardando próxima leitura...\n")
         time.sleep(intervalo)
