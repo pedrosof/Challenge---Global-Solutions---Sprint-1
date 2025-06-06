@@ -5,6 +5,7 @@ import pandas as pd
 import boto3
 import configparser
 from datetime import datetime, timedelta
+from sklearn.ensemble import RandomForestClassifier
 
 app = Flask(__name__)
 model = joblib.load('modelo_risco_deslizamento.joblib')
@@ -57,10 +58,8 @@ def pode_enviar_alerta():
     cur.execute("SELECT enviado_em FROM alertas ORDER BY enviado_em DESC LIMIT 1")
     row = cur.fetchone()
     conn.close()
-
     if not row:
         return True
-
     ultimo_alerta = datetime.fromisoformat(row[0])
     return datetime.now() - ultimo_alerta >= timedelta(minutes=ALERTA_INTERVALO_MINUTOS)
 
@@ -90,6 +89,25 @@ def enviar_alerta_sns(data):
     except Exception as e:
         print(f"[SNS] Falha ao enviar alerta: {e}")
 
+def verificar_e_treinar_modelo():
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT umidade, inclinacao, chuva, risco FROM leituras", conn)
+    conn.close()
+
+    if len(df) > 0 and len(df) % 10 == 0:
+        print(f"[MODELO] Re-treinando com {len(df)} registros...")
+        df['risco'] = df['risco'].map({'baixo': 0, 'medio': 1, 'alto': 2})
+        X = df[['umidade', 'inclinacao', 'chuva']]
+        y = df['risco']
+
+        novo_modelo = RandomForestClassifier(n_estimators=100, random_state=42)
+        novo_modelo.fit(X, y)
+        joblib.dump(novo_modelo, 'modelo_risco_deslizamento.joblib')
+
+        global model
+        model = novo_modelo
+        print("[MODELO] Novo modelo salvo e carregado com sucesso.")
+
 @app.route('/prever', methods=['POST'])
 def prever():
     data = request.json
@@ -113,6 +131,9 @@ def prever():
     ''', (data['umidade'], data['inclinacao'], data['chuva'], resultado))
     conn.commit()
     conn.close()
+
+    # Treina modelo automaticamente a cada 10 leituras
+    verificar_e_treinar_modelo()
 
     # Envia alerta via SNS se risco for alto E já passou intervalo
     if resultado == "alto" and pode_enviar_alerta():
