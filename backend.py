@@ -18,6 +18,7 @@ aws_access_key = config.get('aws', 'access_key')
 aws_secret_key = config.get('aws', 'secret_key')
 aws_region = config.get('aws', 'region')
 sns_topic_arn = config.get('aws', 'sns_topic_arn')
+api_key_config = config.get('auth', 'api_key')
 
 # === Cliente SNS ===
 sns_client = boto3.client(
@@ -29,6 +30,7 @@ sns_client = boto3.client(
 
 DB_PATH = 'dados_alertai.db'
 ALERTA_INTERVALO_MINUTOS = 30
+
 
 def inicializar_tabelas():
     conn = sqlite3.connect(DB_PATH)
@@ -52,16 +54,20 @@ def inicializar_tabelas():
     conn.commit()
     conn.close()
 
+
 def pode_enviar_alerta():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT enviado_em FROM alertas ORDER BY enviado_em DESC LIMIT 1")
     row = cur.fetchone()
     conn.close()
+
     if not row:
         return True
+
     ultimo_alerta = datetime.fromisoformat(row[0])
     return datetime.now() - ultimo_alerta >= timedelta(minutes=ALERTA_INTERVALO_MINUTOS)
+
 
 def registrar_alerta():
     conn = sqlite3.connect(DB_PATH)
@@ -70,11 +76,12 @@ def registrar_alerta():
     conn.commit()
     conn.close()
 
+
 def enviar_alerta_sns(data):
     mensagem = (
         f"⚠️ ALERTA DE RISCO DE DESLIZAMENTO ⚠️\n"
         f"Umidade: {data['umidade']}%\n"
-        f"Inclinação: {data['inclinacao']}°\n"
+        f"Inclinação: {data['inclinacao']}\u00b0\n"
         f"Chuva: {data['chuva']}%\n"
         f"Classificação: RISCO ALTO"
     )
@@ -89,13 +96,13 @@ def enviar_alerta_sns(data):
     except Exception as e:
         print(f"[SNS] Falha ao enviar alerta: {e}")
 
-def verificar_e_treinar_modelo():
+
+def retreinar_modelo():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("SELECT umidade, inclinacao, chuva, risco FROM leituras", conn)
     conn.close()
 
-    if len(df) > 0 and len(df) % 10 == 0:
-        print(f"[MODELO] Re-treinando com {len(df)} registros...")
+    if not df.empty:
         df['risco'] = df['risco'].map({'baixo': 0, 'medio': 1, 'alto': 2})
         X = df[['umidade', 'inclinacao', 'chuva']]
         y = df['risco']
@@ -103,13 +110,18 @@ def verificar_e_treinar_modelo():
         novo_modelo = RandomForestClassifier(n_estimators=100, random_state=42)
         novo_modelo.fit(X, y)
         joblib.dump(novo_modelo, 'modelo_risco_deslizamento.joblib')
-
+        print("[MODELO] Novo modelo salvo com sucesso.")
         global model
         model = novo_modelo
-        print("[MODELO] Novo modelo salvo e carregado com sucesso.")
+
 
 @app.route('/prever', methods=['POST'])
 def prever():
+    # === Valida API Key ===
+    key = request.headers.get('x-api-key')
+    if key != api_key_config:
+        return jsonify({'erro': 'API Key inválida'}), 403
+
     data = request.json
 
     entrada = pd.DataFrame([{
@@ -130,12 +142,17 @@ def prever():
         VALUES (?, ?, ?, ?)
     ''', (data['umidade'], data['inclinacao'], data['chuva'], resultado))
     conn.commit()
+
+    # Verifica quantidade para retreinamento
+    cur.execute('SELECT COUNT(*) FROM leituras')
+    total_leituras = cur.fetchone()[0]
     conn.close()
 
-    # Treina modelo automaticamente a cada 10 leituras
-    verificar_e_treinar_modelo()
+    if total_leituras % 10 == 0:
+        print(f"[MODELO] Retreinando com {total_leituras} exemplos...")
+        retreinar_modelo()
 
-    # Envia alerta via SNS se risco for alto E já passou intervalo
+    # Envia alerta se risco for alto e intervalo ok
     if resultado == "alto" and pode_enviar_alerta():
         enviar_alerta_sns(data)
 
@@ -143,6 +160,7 @@ def prever():
         'status': 'ok',
         'mensagem': f'Leitura registrada com risco {resultado}.'
     })
+
 
 if __name__ == '__main__':
     inicializar_tabelas()
