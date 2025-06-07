@@ -1,6 +1,7 @@
 from flask import Flask, render_template_string
 import sqlite3
 import os
+import subprocess
 
 app = Flask(__name__)
 
@@ -35,6 +36,17 @@ HTML_TEMPLATE = """
 </html>
 """
 
+def executar_analise_r():
+    try:
+        resultado = subprocess.run(["/usr/local/bin/Rscript", "analise_alerta.R"], capture_output=True, text=True)
+        if resultado.returncode == 0:
+            print("[Rscript] Análise R executada com sucesso.")
+        else:
+            print("[Rscript] Falha ao executar o script R:")
+            print(resultado.stderr)
+    except Exception as e:
+        print(f"[Rscript] Erro ao tentar executar o script R: {e}")
+
 def recuperar_graficos():
     arquivos_existentes = {nome: False for nome in GRAFICOS}
 
@@ -68,4 +80,5 @@ def index():
     return render_template_string(HTML_TEMPLATE, graficos=GRAFICOS, arquivos_existentes=arquivos_ok)
 
 if __name__ == "__main__":
+    executar_analise_r()
     app.run(host="0.0.0.0", port=8080)
