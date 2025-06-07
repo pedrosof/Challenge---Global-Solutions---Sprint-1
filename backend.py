@@ -31,7 +31,6 @@ sns_client = boto3.client(
 DB_PATH = 'dados_alertai.db'
 ALERTA_INTERVALO_MINUTOS = 30
 
-
 def inicializar_tabelas():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -51,9 +50,15 @@ def inicializar_tabelas():
             enviado_em DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS importancias (
+            variavel TEXT PRIMARY KEY,
+            importancia REAL,
+            atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     conn.commit()
     conn.close()
-
 
 def pode_enviar_alerta():
     conn = sqlite3.connect(DB_PATH)
@@ -68,7 +73,6 @@ def pode_enviar_alerta():
     ultimo_alerta = datetime.fromisoformat(row[0])
     return datetime.now() - ultimo_alerta >= timedelta(minutes=ALERTA_INTERVALO_MINUTOS)
 
-
 def registrar_alerta():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -76,12 +80,11 @@ def registrar_alerta():
     conn.commit()
     conn.close()
 
-
 def enviar_alerta_sns(data):
     mensagem = (
         f"⚠️ ALERTA DE RISCO DE DESLIZAMENTO ⚠️\n"
         f"Umidade: {data['umidade']}%\n"
-        f"Inclinação: {data['inclinacao']}\u00b0\n"
+        f"Inclinação: {data['inclinacao']}°\n"
         f"Chuva: {data['chuva']}%\n"
         f"Classificação: RISCO ALTO"
     )
@@ -96,6 +99,23 @@ def enviar_alerta_sns(data):
     except Exception as e:
         print(f"[SNS] Falha ao enviar alerta: {e}")
 
+def salvar_importancias_modelo(model):
+    importancias = model.feature_importances_
+    variaveis = ['umidade', 'inclinacao', 'chuva']
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM importancias")
+
+    for var, imp in zip(variaveis, importancias):
+        cur.execute('''
+            INSERT INTO importancias (variavel, importancia, atualizado_em)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+        ''', (var, float(imp)))
+
+    conn.commit()
+    conn.close()
+    print("[MODELO] Importâncias atualizadas no banco.")
 
 def retreinar_modelo():
     conn = sqlite3.connect(DB_PATH)
@@ -111,19 +131,17 @@ def retreinar_modelo():
         novo_modelo.fit(X, y)
         joblib.dump(novo_modelo, 'modelo_risco_deslizamento.joblib')
         print("[MODELO] Novo modelo salvo com sucesso.")
+        salvar_importancias_modelo(novo_modelo)
         global model
         model = novo_modelo
 
-
 @app.route('/prever', methods=['POST'])
 def prever():
-    # === Valida API Key ===
     key = request.headers.get('x-api-key')
     if key != api_key_config:
         return jsonify({'erro': 'API Key inválida'}), 403
 
     data = request.json
-
     entrada = pd.DataFrame([{
         'umidade': data['umidade'],
         'inclinacao': data['inclinacao'],
@@ -134,7 +152,6 @@ def prever():
     risco_map = {0: "baixo", 1: "medio", 2: "alto"}
     resultado = risco_map[pred]
 
-    # Grava leitura no banco
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute('''
@@ -142,8 +159,6 @@ def prever():
         VALUES (?, ?, ?, ?)
     ''', (data['umidade'], data['inclinacao'], data['chuva'], resultado))
     conn.commit()
-
-    # Verifica quantidade para retreinamento
     cur.execute('SELECT COUNT(*) FROM leituras')
     total_leituras = cur.fetchone()[0]
     conn.close()
@@ -152,7 +167,6 @@ def prever():
         print(f"[MODELO] Retreinando com {total_leituras} exemplos...")
         retreinar_modelo()
 
-    # Envia alerta se risco for alto e intervalo ok
     if resultado == "alto" and pode_enviar_alerta():
         enviar_alerta_sns(data)
 
@@ -160,7 +174,6 @@ def prever():
         'status': 'ok',
         'mensagem': f'Leitura registrada com risco {resultado}.'
     })
-
 
 if __name__ == '__main__':
     inicializar_tabelas()

@@ -10,7 +10,9 @@ STATIC_DIR = "static"
 GRAFICOS = {
     "grafico_risco": "grafico_risco.png",
     "grafico_umidade_boxplot": "grafico_umidade_boxplot.png",
-    "grafico_umidade_hist": "grafico_umidade_hist.png"
+    "grafico_umidade_hist": "grafico_umidade_hist.png",
+    "grafico_densidade_decisao": "grafico_densidade_decisao.png",
+    "grafico_importancia_variaveis": "grafico_importancia_variaveis.png"
 }
 
 HTML_TEMPLATE = """

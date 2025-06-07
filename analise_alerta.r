@@ -60,6 +60,26 @@ g3 <- ggplot(dados, aes(x = umidade)) +
   theme_minimal()
 salvar_grafico("grafico_umidade_hist", g3)
 
+g4 <- ggplot(dados, aes(x = chuva, y = inclinacao)) +
+  stat_density_2d(aes(fill = after_stat(level)), geom = "polygon") +
+  geom_point(aes(color = risco), size = 2) +
+  scale_fill_viridis_c() +
+  labs(title = "Densidade de Ocorrência por Classe de Risco",
+       x = "Chuva (%)", y = "Inclinação (°)", fill = "Densidade") +
+  theme_minimal()
+salvar_grafico("grafico_densidade_decisao", g4)
+
+importancias <- dbGetQuery(con, "SELECT * FROM importancias")
+
+g_importancias <- ggplot(importancias, aes(x = reorder(variavel, importancia), y = importancia)) +
+  geom_col(fill = "#2E8B57") +
+  labs(title = "Importância das Variáveis no Modelo",
+       x = "Variável", y = "Importância") +
+  coord_flip() +
+  theme_minimal()
+
+salvar_grafico("grafico_importancia_variaveis", g_importancias)
+
 # Finaliza
 dbDisconnect(con)
-cat("✅ Gráficos salvos no banco de dados com sucesso.\n")
+cat("Gráficos salvos no banco de dados com sucesso.\n")

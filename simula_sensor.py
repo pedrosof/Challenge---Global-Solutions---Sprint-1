@@ -4,7 +4,7 @@ import time
 
 # URL do backend
 BACKEND_URL = "http://localhost:6000/prever"
-API_KEY = "xxxxxxxx"  # Substitua pela sua chave
+API_KEY = "xxxxxxxxxx"  # Substitua pela sua chave
 
 # Gera dados simulados como se fossem sensores reais
 def gerar_dado_simulado():
@@ -32,9 +32,9 @@ def enviar_simulacao(qtd=10, intervalo=2):
             if response.status_code == 200:
                 print(f"✔️ Enviado com sucesso → Resposta: {response.json()}")
             else:
-                print(f"❌ Erro HTTP {response.status_code} → {response.text}")
+                print(f"Erro HTTP {response.status_code} → {response.text}")
         except Exception as e:
-            print(f"🚫 Erro de conexão: {e}")
+            print(f"Erro de conexão: {e}")
 
         print(f"[{i+1}] LED OFF → Aguardando próxima leitura...\n")
         time.sleep(intervalo)
