@@ -34,6 +34,11 @@ https://wokwi.com/projects/432836568532173825
 
 ---
 
+### Video do projeto
+https://youtu.be/pxd2Jf1HSlc
+
+---
+
 ## Requisitos
 
 ### Python
