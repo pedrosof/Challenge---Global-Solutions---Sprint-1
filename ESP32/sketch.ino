@@ -14,8 +14,8 @@ char* WIFI_PASSWORD = "";
 WiFiClient client;
 
 // === Backend Flask ===
-String backendURL = "http://192.168.1.100:5000/prever"; // Altere conforme seu IP
-String apiKey = "RLAOgaeHGa0hOumzEBV60XoNJe46BSB8ndC3awI1";  // Substitua pela sua chave real
+String backendURL = "http://127.0.0.1:6000/prever"; // Altere conforme seu IP
+String apiKey = "xxxxxxxxx";  // Substitua pela sua chave real
 
 // === MPU6050 variáveis ===
 int16_t ax, ay, az;

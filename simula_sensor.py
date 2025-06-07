@@ -4,7 +4,7 @@ import time
 
 # URL do backend
 BACKEND_URL = "http://localhost:6000/prever"
-API_KEY = "RLAOgaeHGa0hOumzEBV60XoNJe46BSB8ndC3awI1"  # Substitua pela sua chave
+API_KEY = "xxxxxxxx"  # Substitua pela sua chave
 
 # Gera dados simulados como se fossem sensores reais
 def gerar_dado_simulado():
